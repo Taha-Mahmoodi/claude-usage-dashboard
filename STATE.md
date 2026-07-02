@@ -5,18 +5,22 @@
 
 ## Current phase
 
-**Phase 1 — Next.js scaffold + glass shell** (build order step 1). Foundation (Phase 0) complete.
+**Phase 2 — data layer against fixtures** (build order step 2). Phase 0 + Phase 1 complete.
 
 ## Last completed
 
-- Phase 0 setup done:
-  - Planning docs + design spec committed (baseline `c5857bc`), `.gitignore` added.
-  - App repo (private): https://github.com/Taha-Mahmoodi/claude-usage-dashboard — branches `prod` (deployed) + `dev` (default/integration), both pushed.
-  - Data repo (public): https://github.com/Taha-Mahmoodi/claude-usage-data — branch `main`, seeded with `devices.json` (`[]`) + `data/` + README.
+- Phase 0 setup: repos created, `prod`+`dev` branches, data repo seeded, STATE.md.
+- Phase 1 scaffold (branch `feat/scaffold`, PR into `dev`):
+  - Next.js 16 + React 19 + Tailwind v4 + shadcn/ui, App Router, TS, in this folder (planning docs stay at root).
+  - Dark-only glass theme in `app/globals.css`: navy gradient bg, `glass`/`glass-hover` utilities, amber `--warning` token.
+  - `app/layout.tsx` (dark class, real metadata), `app/page.tsx` shell = 7 placeholder glass panels in a responsive grid.
+  - `next.config.ts` pins `turbopack.root` (stray home-dir lockfile was misleading root inference).
+  - Verified: `tsc --noEmit` clean, `npm run build` clean, `eslint .` clean, no console errors, glass renders at desktop + mobile (390px collapses to 1 col).
+  - Tooling installed this session: `bun` (via brew) so the `/browse` skill daemon runs.
 
 ## Next task
 
-Scaffold Next.js 14+ (App Router, TS) + Tailwind + shadcn/ui into THIS folder (planning docs stay at root). Theme provider, fonts, glass background shell, no data yet. Do it on branch `feat/scaffold` off `dev`, PR into `dev`.
+Phase 2: `__fixtures__/sample-device.ndjson`, then `lib/types.ts`, `lib/metrics.ts` (rolling 5h/7d windows, per-device/model aggregates, cache hit rate, complexity percentiles, burn-rate projection), `lib/fetch-usage.ts`, `lib/recommendations.ts`, `config/limits.ts`. Pure functions only in `lib/`. Add assert-based test files for `metrics` + `recommendations` (sandbox protocol). Branch `feat/data-layer` off `dev`.
 
 ## Blockers / open items
 
