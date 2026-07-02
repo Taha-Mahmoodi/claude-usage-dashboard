@@ -10,6 +10,7 @@ import { recommend } from "@/lib/recommendations";
 import { LIMITS } from "@/config/limits";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useEntrance } from "./anim";
 import { QuotaGauge } from "./quota-gauge";
 import { BurnRateCard } from "./burn-rate-card";
 import { CacheHitRate } from "./cache-hit-rate";
@@ -34,7 +35,7 @@ function Panel({
   children: React.ReactNode;
 }) {
   return (
-    <Card className={`glass glass-hover gap-3 p-5 ${className}`}>
+    <Card className={`dash-panel glass glass-hover gap-3 p-5 ${className}`}>
       <div>
         <div className="text-sm font-medium text-foreground/90">{title}</div>
         {sub && <div className="text-xs text-muted-foreground">{sub}</div>}
@@ -65,9 +66,13 @@ export function Dashboard() {
     [rows, now],
   );
   const recs = useMemo(() => (metrics ? recommend(metrics, LIMITS) : []), [metrics]);
+  const gridRef = useEntrance<HTMLDivElement>(".dash-panel");
 
   return (
-    <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-4">
+    <div
+      ref={gridRef}
+      className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-4"
+    >
       <Panel
         title="Quota & burn-rate"
         sub="trailing 5h / 7d windows"

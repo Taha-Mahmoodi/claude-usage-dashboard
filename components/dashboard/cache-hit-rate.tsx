@@ -3,6 +3,7 @@
 import type { DeviceMetric } from "@/lib/metrics";
 import { pct } from "@/lib/format";
 import { LIMITS } from "@/config/limits";
+import { useCountUp } from "./anim";
 
 export function CacheHitRate({
   overall,
@@ -11,10 +12,13 @@ export function CacheHitRate({
   overall: number;
   devices: DeviceMetric[];
 }) {
+  const numRef = useCountUp<HTMLDivElement>(overall, (n) => pct(n));
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <div className="text-3xl font-semibold tabular-nums">{pct(overall)}</div>
+        <div ref={numRef} className="text-3xl font-semibold tabular-nums">
+          {pct(overall)}
+        </div>
         <div className="text-xs text-muted-foreground">overall cache reuse</div>
       </div>
       <div className="flex flex-col gap-2">

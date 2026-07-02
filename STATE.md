@@ -5,21 +5,22 @@
 
 ## Current phase
 
-**Phase 4 — animations (GSAP entrance + anime.js micro-interactions)** (build order step 4). Phases 0–3 complete.
+**Phase 5 — swap fixture for real fetch** (build order step 5). Phases 0–4 complete.
 
-## Last completed
+### Phase 4 done (`feat/animations`, stacked, PR #4)
+- `components/dashboard/anim.ts`: `useEntrance` (GSAP stagger) + `useCountUp` (anime.js). GSAP + anime.js imported **dynamically inside effects** — confirmed still lazy (initial JS 195.5KB, +0.6KB only). Both respect `prefers-reduced-motion`; content visible without JS.
+- QuotaGauge drives arc fill + number via anime.js; CacheHitRate counts up; grid panels stagger in via GSAP.
+- Verified: tsc/eslint/build clean, 10 tests pass, settled layout matches Phase 3, no new console errors.
 
-- Phases 0–2: repos, branches, scaffold (**PR #1**), data layer + tests (**PR #2**). Both awaiting Taha's merge.
-- Phase 3 components (`feat/dashboard-components`, stacked on `feat/data-layer`, **PR #3**):
-  - 8 components in `components/dashboard/`: quota-gauge (SVG 270° arc), burn-rate-card, device-breakdown (Recharts bar), model-mix-chart (Recharts donut), cache-hit-rate (scaleX bars), top-tasks-table (shadcn Table), trend-chart (Recharts area, hourly→daily rollup), recommendations-feed.
-  - `dashboard.tsx` orchestrator (client): fetches fixture via `fetchUsage(FIXTURE_BASE)` + `shiftToNow`, `useMemo` metrics + recs, grid layout. The 3 Recharts charts `next/dynamic` `ssr:false` (kept out of initial bundle).
-  - `lib/fixture.ts` (shift ref→now), `lib/format.ts` (fmtTokens/pct/fmtHours). Multi-device fixtures in `public/fixtures/` (4 devices, one outlier + one low-cache) via updated `generate.mjs`.
-  - Chart palette added to `globals.css` (`--chart-1..5`). Tuned `config/limits.ts` caps to demo-friendly values (gauges fill, approaching-limit fires) — flagged to recalibrate.
-  - Verified: tsc/eslint/build clean, 10 tests pass, **initial route JS 195KB gzip < 200KB budget** (Recharts confirmed code-split out via ssr:false dynamic import), renders clean desktop + mobile, no console errors (one benign transient Recharts `width(0)` dev warning on first paint).
+### Earlier phases
+- Phases 0–2: repos, branches, scaffold (**PR #1**), data layer + tests (**PR #2**). Awaiting Taha's merge.
+- Phase 3 (`feat/dashboard-components`, **PR #3**): 8 components + orchestrator, Recharts charts dynamic `ssr:false`, multi-device fixtures, chart palette, demo-tuned caps. Initial JS 195KB < 200KB. Verified.
 
 ## Next task
 
-Phase 4: GSAP entrance (stagger the panels in on load) + anime.js micro-interactions (quota-gauge fill count-up, number count-ups). Both **dynamically imported** so they stay out of the initial 195KB bundle (perf rule). Animate transform/opacity only (no layout props). shadcn/Radix handles its own transitions — don't hand-roll those. Branch `feat/animations` off `feat/dashboard-components` (stacked).
+Phase 5: swap the fixture source for the real fetch. Default the dashboard to `fetchUsage()` (real repo, no shift); keep fixtures behind `NEXT_PUBLIC_USE_FIXTURES=1` for dev. Add a graceful empty state (real repo has no device data yet → "install the hook" message). Verify against the live public repo. Branch `feat/real-fetch` off `feat/animations` (stacked).
+
+Then **Phase 6** (data-collection side, from the design spec): the Claude Code plugin — a `Stop` hook that reads `transcript_path`, extracts the latest usage block (model, input/output/cache tokens, tool_use count), appends to `~/.claude-usage/queue.ndjson`, and batches a `git pull/append/commit/push` to the data repo every `PUSH_INTERVAL_MIN`. Device name = hostname (config override). Must be safe to re-run and never lose the queue on push failure. One assert-based test on the transcript-extraction logic.
 
 ## Perf-rule status
 

@@ -1,8 +1,11 @@
 "use client";
 
+import { useLayoutEffect, useRef } from "react";
 import { fmtTokens, pct } from "@/lib/format";
+import { prefersReducedMotion } from "./anim";
 
 // 270° arc gauge. Blue under 80%, amber 80–100%, red at/over cap.
+// anime.js fills the arc and counts the number up on mount (perf rule: lib is lazy).
 export function QuotaGauge({
   used,
   cap,
@@ -20,22 +23,52 @@ export function QuotaGauge({
   const circ = 2 * Math.PI * r;
   const arc = 0.75; // fraction of the circle the gauge spans (270°)
   const track = circ * arc;
-  const offset = track * (1 - ratio);
+  const finalOffset = track * (1 - ratio);
   const color = over
     ? "var(--destructive)"
     : ratio > 0.8
       ? "var(--warning)"
       : "var(--primary)";
 
+  const fillRef = useRef<SVGCircleElement>(null);
+  const numRef = useRef<HTMLSpanElement>(null);
+
+  useLayoutEffect(() => {
+    if (prefersReducedMotion()) return; // leave rendered-final state
+    const fill = fillRef.current;
+    const num = numRef.current;
+    if (!fill || !num) return;
+    fill.style.strokeDashoffset = String(track); // start empty
+    num.textContent = "0%";
+    let cancelled = false;
+    const obj = { p: 0 };
+    import("animejs")
+      .then(({ animate }) => {
+        if (cancelled) return;
+        animate(obj, {
+          p: 1,
+          duration: 950,
+          ease: "outCubic",
+          onUpdate: () => {
+            if (fillRef.current)
+              fillRef.current.style.strokeDashoffset = String(track * (1 - ratio * obj.p));
+            if (numRef.current) numRef.current.textContent = pct(ratio * obj.p);
+          },
+        });
+      })
+      .catch(() => {
+        if (fillRef.current) fillRef.current.style.strokeDashoffset = String(finalOffset);
+        if (numRef.current) numRef.current.textContent = pct(ratio);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [ratio, track, finalOffset]);
+
   return (
     <div className="flex flex-col items-center">
       <div className="relative" style={{ width: size, height: size }}>
-        <svg
-          width={size}
-          height={size}
-          // rotate so the 90° gap sits at the bottom
-          style={{ transform: "rotate(135deg)" }}
-        >
+        <svg width={size} height={size} style={{ transform: "rotate(135deg)" }}>
           <circle
             cx={size / 2}
             cy={size / 2}
@@ -47,7 +80,7 @@ export function QuotaGauge({
             strokeLinecap="round"
           />
           <circle
-            data-gauge-fill
+            ref={fillRef}
             cx={size / 2}
             cy={size / 2}
             r={r}
@@ -55,13 +88,13 @@ export function QuotaGauge({
             stroke={color}
             strokeWidth={stroke}
             strokeDasharray={`${track} ${circ}`}
-            strokeDashoffset={offset}
+            strokeDashoffset={finalOffset}
             strokeLinecap="round"
-            style={{ transition: "stroke-dashoffset 0.8s ease, stroke 0.4s ease" }}
           />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
           <span
+            ref={numRef}
             className="text-2xl font-semibold tabular-nums"
             style={{ color: over ? "var(--destructive)" : undefined }}
           >
