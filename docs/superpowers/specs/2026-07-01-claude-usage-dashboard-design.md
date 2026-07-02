@@ -16,7 +16,14 @@ tokens more efficiently.
 - Tracks Claude Code CLI usage only. The desktop/web/mobile chat apps don't expose
   per-task token counts anywhere a script can read them, so this only works for devices
   running Claude Code. All 10+ devices are Claude Code CLI going forward.
-- Single user, personal tool. No auth, no multi-tenancy.
+- Single user, personal tool. No auth, no multi-tenancy. Built as a personal Claude Code
+  **plugin** (not a skill — skills only run when Claude decides they're relevant; this
+  needs a `Stop` hook, which fires unconditionally after every task, so it has to live
+  in a plugin). Values like device name and repo URL are hardcoded/config-file for
+  Taha's own setup — not generalized for public distribution. Could be generalized into
+  an installable plugin for others later, but that's explicitly deferred: it would need
+  a setup wizard, input validation, and docs, none of which help the actual goal (don't
+  get rate-limited) any faster.
 - No task content (prompts/responses) is ever collected or stored — only usage metadata
   (token counts, model, tool-call counts). This is what allows the data repo to be public.
 
