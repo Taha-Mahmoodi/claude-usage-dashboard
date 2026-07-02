@@ -5,7 +5,11 @@
 
 ## Current phase
 
-**ALL PHASES COMPLETE.** Build finished; 6 stacked PRs open awaiting Taha's merges (#1→#6, merge in order). Then promote `dev → prod` and deploy to the VPS (needs the VPS path — still owed).
+**ALL PHASES COMPLETE + DEPLOYED LIVE.** 7 stacked PRs open awaiting Taha's merges (#1→#7, in order).
+
+### Deployed (`feat/deploy-static-export`, PR #7)
+- **Live: https://cos.piiix.org** — static export (`output:'export'`) served by nginx on the VPS (`147.93.138.77`, SSH alias `lucifers-vps`). Let's Encrypt TLS via acme.sh (auto-renew), HTTP→HTTPS redirect. Webroot `/www/wwwroot/cos.piiix.org`, vhost `/www/server/panel/vhost/nginx/cos.piiix.org.conf`. Deployed additively alongside the existing aaPanel site `lucifersdiary.com` (verified still 200). One-command redeploy: `./scripts/deploy.sh`. Config in `CLAUDE.md`.
+- Shows empty state until the collector (`plugin/`) runs on a device. **Next natural step:** install the collector on Taha's machines so real data flows.
 
 ### Phase 6 done (`feat/collector-plugin`, stacked, PR #6)
 - `plugin/` — Claude Code Stop-hook collector. `hooks/collect.mjs` (no deps): extracts latest assistant `usage` block + tool_use count from the transcript, appends to `~/.claude-usage/queue.ndjson`, and every `pushIntervalMin` does a **transactional** pull→append→commit→push (queue cleared only on push success; any failure hard-resets to `@{u}` and retains the queue — no loss, no double-write). `plugin.json` + `hooks/hooks.json` register the Stop hook; `README.md` has per-device install.
