@@ -23,10 +23,17 @@ export function parseNdjson(text: string, device: string): DeviceRow[] {
 }
 
 export async function fetchUsage(base: string = DATA_BASE): Promise<DeviceRow[]> {
-  const devices: string[] = await fetch(`${base}devices.json`).then((r) => r.json());
+  // Cache-bust so every load is current — GitHub's raw CDN edge-caches by URL for ~5 min,
+  // which a plain fetch can't bypass. A unique query param forces a fresh origin read.
+  const bust = () => `?t=${Date.now()}`;
+  const devices: string[] = await fetch(`${base}devices.json${bust()}`, {
+    cache: "no-store",
+  }).then((r) => r.json());
   const perDevice = await Promise.all(
     devices.map(async (d) => {
-      const res = await fetch(`${base}data/${encodeURIComponent(d)}.ndjson`);
+      const res = await fetch(`${base}data/${encodeURIComponent(d)}.ndjson${bust()}`, {
+        cache: "no-store",
+      });
       if (!res.ok) return [] as DeviceRow[];
       return parseNdjson(await res.text(), d);
     }),
