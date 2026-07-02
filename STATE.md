@@ -5,22 +5,38 @@
 
 ## Current phase
 
-**Phase 2 — data layer against fixtures** (build order step 2). Phase 0 + Phase 1 complete.
+**ALL PHASES COMPLETE + DEPLOYED LIVE.** 7 stacked PRs open awaiting Taha's merges (#1→#7, in order).
 
-## Last completed
+### Deployed (`feat/deploy-static-export`, PR #7)
+- **Live: https://cos.piiix.org** — static export (`output:'export'`) served by nginx on the VPS (`147.93.138.77`, SSH alias `lucifers-vps`). Let's Encrypt TLS via acme.sh (auto-renew), HTTP→HTTPS redirect. Webroot `/www/wwwroot/cos.piiix.org`, vhost `/www/server/panel/vhost/nginx/cos.piiix.org.conf`. Deployed additively alongside the existing aaPanel site `lucifersdiary.com` (verified still 200). One-command redeploy: `./scripts/deploy.sh`. Config in `CLAUDE.md`.
+- Shows empty state until the collector (`plugin/`) runs on a device. **Next natural step:** install the collector on Taha's machines so real data flows.
 
-- Phase 0 setup: repos created, `prod`+`dev` branches, data repo seeded, STATE.md.
-- Phase 1 scaffold (branch `feat/scaffold`, PR into `dev`):
-  - Next.js 16 + React 19 + Tailwind v4 + shadcn/ui, App Router, TS, in this folder (planning docs stay at root).
-  - Dark-only glass theme in `app/globals.css`: navy gradient bg, `glass`/`glass-hover` utilities, amber `--warning` token.
-  - `app/layout.tsx` (dark class, real metadata), `app/page.tsx` shell = 7 placeholder glass panels in a responsive grid.
-  - `next.config.ts` pins `turbopack.root` (stray home-dir lockfile was misleading root inference).
-  - Verified: `tsc --noEmit` clean, `npm run build` clean, `eslint .` clean, no console errors, glass renders at desktop + mobile (390px collapses to 1 col).
-  - Tooling installed this session: `bun` (via brew) so the `/browse` skill daemon runs.
+### Phase 6 done (`feat/collector-plugin`, stacked, PR #6)
+- `plugin/` — Claude Code Stop-hook collector. `hooks/collect.mjs` (no deps): extracts latest assistant `usage` block + tool_use count from the transcript, appends to `~/.claude-usage/queue.ndjson`, and every `pushIntervalMin` does a **transactional** pull→append→commit→push (queue cleared only on push success; any failure hard-resets to `@{u}` and retains the queue — no loss, no double-write). `plugin.json` + `hooks/hooks.json` register the Stop hook; `README.md` has per-device install.
+- Verified: 3 unit tests (extraction), plus end-to-end runs — happy path (2 rows pushed, queue cleared, devices.json updated), pull-fail (queue retained), and **push-rejected-after-commit** (HEAD rolled back, queue retained, no orphan row). tsc/eslint/build clean, 13 tests total pass.
+
+### Phase 5 done (`feat/real-fetch`, stacked, PR #5)
+- `dashboard.tsx` defaults to real `fetchUsage()`; fixtures only when `NEXT_PUBLIC_USE_FIXTURES=1` (set in `.env.development`, so dev shows fixtures, prod fetches real). Added `Notice` empty state.
+- Verified against the **live** public repo: prod build (no flag) → real fetch → empty repo → "No usage data yet" empty state; dev (flag) → full fixture dashboard. tsc/eslint/build/tests all clean.
+
+### Phase 4 done (`feat/animations`, stacked, PR #4)
+- `components/dashboard/anim.ts`: `useEntrance` (GSAP stagger) + `useCountUp` (anime.js). GSAP + anime.js imported **dynamically inside effects** — confirmed still lazy (initial JS 195.5KB, +0.6KB only). Both respect `prefers-reduced-motion`; content visible without JS.
+- QuotaGauge drives arc fill + number via anime.js; CacheHitRate counts up; grid panels stagger in via GSAP.
+- Verified: tsc/eslint/build clean, 10 tests pass, settled layout matches Phase 3, no new console errors.
+
+### Earlier phases
+- Phases 0–2: repos, branches, scaffold (**PR #1**), data layer + tests (**PR #2**). Awaiting Taha's merge.
+- Phase 3 (`feat/dashboard-components`, **PR #3**): 8 components + orchestrator, Recharts charts dynamic `ssr:false`, multi-device fixtures, chart palette, demo-tuned caps. Initial JS 195KB < 200KB. Verified.
 
 ## Next task
 
-Phase 2: `__fixtures__/sample-device.ndjson`, then `lib/types.ts`, `lib/metrics.ts` (rolling 5h/7d windows, per-device/model aggregates, cache hit rate, complexity percentiles, burn-rate projection), `lib/fetch-usage.ts`, `lib/recommendations.ts`, `config/limits.ts`. Pure functions only in `lib/`. Add assert-based test files for `metrics` + `recommendations` (sandbox protocol). Branch `feat/data-layer` off `dev`.
+Phase 5: swap the fixture source for the real fetch. Default the dashboard to `fetchUsage()` (real repo, no shift); keep fixtures behind `NEXT_PUBLIC_USE_FIXTURES=1` for dev. Add a graceful empty state (real repo has no device data yet → "install the hook" message). Verify against the live public repo. Branch `feat/real-fetch` off `feat/animations` (stacked).
+
+Then **Phase 6** (data-collection side, from the design spec): the Claude Code plugin — a `Stop` hook that reads `transcript_path`, extracts the latest usage block (model, input/output/cache tokens, tool_use count), appends to `~/.claude-usage/queue.ndjson`, and batches a `git pull/append/commit/push` to the data repo every `PUSH_INTERVAL_MIN`. Device name = hostname (config override). Must be safe to re-run and never lose the queue on push failure. One assert-based test on the transcript-extraction logic.
+
+## Perf-rule status
+
+MET for now: initial route JS **194.9KB gzip < 200KB** (measured from prod HTML's referenced chunks; Recharts is a separate lazy chunk). Still owed: a real Lighthouse ≥95 / FCP <1.5s run — best done against the deployed VPS build; architecture (static prerender + code-split heavy libs) supports it. Keep GSAP/anime.js dynamically imported so Phase 4 doesn't blow the budget.
 
 ## Blockers / open items
 

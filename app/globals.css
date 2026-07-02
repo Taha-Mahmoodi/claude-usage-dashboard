@@ -142,6 +142,11 @@
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 14%);
   --ring: oklch(0.72 0.11 244 / 60%);
+  --chart-1: oklch(0.72 0.11 244); /* blue */
+  --chart-2: oklch(0.75 0.13 190); /* cyan */
+  --chart-3: oklch(0.7 0.14 300); /* violet */
+  --chart-4: oklch(0.8 0.14 79); /* amber */
+  --chart-5: oklch(0.74 0.13 150); /* green */
 }
 
 @layer base {
