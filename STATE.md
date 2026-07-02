@@ -5,7 +5,11 @@
 
 ## Current phase
 
-**Phase 6 — Claude Code collector plugin (Stop hook + sync)** (design spec §Data collection/Sync). Phases 0–5 complete. This is the LAST phase.
+**ALL PHASES COMPLETE.** Build finished; 6 stacked PRs open awaiting Taha's merges (#1→#6, merge in order). Then promote `dev → prod` and deploy to the VPS (needs the VPS path — still owed).
+
+### Phase 6 done (`feat/collector-plugin`, stacked, PR #6)
+- `plugin/` — Claude Code Stop-hook collector. `hooks/collect.mjs` (no deps): extracts latest assistant `usage` block + tool_use count from the transcript, appends to `~/.claude-usage/queue.ndjson`, and every `pushIntervalMin` does a **transactional** pull→append→commit→push (queue cleared only on push success; any failure hard-resets to `@{u}` and retains the queue — no loss, no double-write). `plugin.json` + `hooks/hooks.json` register the Stop hook; `README.md` has per-device install.
+- Verified: 3 unit tests (extraction), plus end-to-end runs — happy path (2 rows pushed, queue cleared, devices.json updated), pull-fail (queue retained), and **push-rejected-after-commit** (HEAD rolled back, queue retained, no orphan row). tsc/eslint/build clean, 13 tests total pass.
 
 ### Phase 5 done (`feat/real-fetch`, stacked, PR #5)
 - `dashboard.tsx` defaults to real `fetchUsage()`; fixtures only when `NEXT_PUBLIC_USE_FIXTURES=1` (set in `.env.development`, so dev shows fixtures, prod fetches real). Added `Notice` empty state.

@@ -1,0 +1,6 @@
+{
+  "name": "claude-usage-collector",
+  "version": "0.1.0",
+  "description": "Stop hook that records Claude Code usage metadata (token counts, model, tool-call counts) and batches it to a public data repo. Never reads prompt/response content.",
+  "author": { "name": "Taha" }
+}
