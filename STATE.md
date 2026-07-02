@@ -5,7 +5,11 @@
 
 ## Current phase
 
-**Phase 5 — swap fixture for real fetch** (build order step 5). Phases 0–4 complete.
+**Phase 6 — Claude Code collector plugin (Stop hook + sync)** (design spec §Data collection/Sync). Phases 0–5 complete. This is the LAST phase.
+
+### Phase 5 done (`feat/real-fetch`, stacked, PR #5)
+- `dashboard.tsx` defaults to real `fetchUsage()`; fixtures only when `NEXT_PUBLIC_USE_FIXTURES=1` (set in `.env.development`, so dev shows fixtures, prod fetches real). Added `Notice` empty state.
+- Verified against the **live** public repo: prod build (no flag) → real fetch → empty repo → "No usage data yet" empty state; dev (flag) → full fixture dashboard. tsc/eslint/build/tests all clean.
 
 ### Phase 4 done (`feat/animations`, stacked, PR #4)
 - `components/dashboard/anim.ts`: `useEntrance` (GSAP stagger) + `useCountUp` (anime.js). GSAP + anime.js imported **dynamically inside effects** — confirmed still lazy (initial JS 195.5KB, +0.6KB only). Both respect `prefers-reduced-motion`; content visible without JS.

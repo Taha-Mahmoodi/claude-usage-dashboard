@@ -23,6 +23,17 @@ const DeviceBreakdown = dynamic(() => import("./device-breakdown"), { ssr: false
 const ModelMixChart = dynamic(() => import("./model-mix-chart"), { ssr: false, loading: chartLoading });
 const TrendChart = dynamic(() => import("./trend-chart"), { ssr: false, loading: chartLoading });
 
+const USE_FIXTURES = process.env.NEXT_PUBLIC_USE_FIXTURES === "1";
+
+function Notice({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <Card className="glass mx-auto max-w-lg items-center gap-2 p-10 text-center">
+      <div className="text-base font-medium">{title}</div>
+      <p className="text-sm leading-relaxed text-muted-foreground">{children}</p>
+    </Card>
+  );
+}
+
 function Panel({
   title,
   sub,
@@ -52,9 +63,12 @@ export function Dashboard() {
 
   useEffect(() => {
     let alive = true;
-    // Phase 3: fixture source. Phase 5 swaps to fetchUsage() against the real repo.
-    fetchUsage(FIXTURE_BASE)
-      .then((raw) => alive && setRows(shiftToNow(raw, now)))
+    // Real data repo by default; fixtures only when NEXT_PUBLIC_USE_FIXTURES=1 (dev).
+    const load = USE_FIXTURES
+      ? fetchUsage(FIXTURE_BASE).then((raw) => shiftToNow(raw, now))
+      : fetchUsage();
+    load
+      .then((r) => alive && setRows(r))
       .catch((e) => alive && setError(String(e)));
     return () => {
       alive = false;
@@ -67,6 +81,23 @@ export function Dashboard() {
   );
   const recs = useMemo(() => (metrics ? recommend(metrics, LIMITS) : []), [metrics]);
   const gridRef = useEntrance<HTMLDivElement>(".dash-panel");
+
+  if (error) {
+    return (
+      <Notice title="Couldn’t load usage data">
+        Failed to fetch from the data repo. Check that it’s public and reachable.
+      </Notice>
+    );
+  }
+  if (rows !== null && rows.length === 0) {
+    return (
+      <Notice title="No usage data yet">
+        Install the collector hook on your devices to start tracking (see{" "}
+        <code className="rounded bg-white/10 px-1 py-0.5 text-xs">plugin/</code>).
+        Each device pushes its own usage metadata to the data repo.
+      </Notice>
+    );
+  }
 
   return (
     <div
