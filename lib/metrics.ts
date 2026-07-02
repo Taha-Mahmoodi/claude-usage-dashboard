@@ -137,10 +137,24 @@ export interface BurnRate {
   hitsWithinWindow: boolean;
 }
 
+export interface WindowQuota {
+  used: number;
+  cap: number;
+  ratio: number; // used / cap, clamped 0..1
+  calibrated: boolean; // true = cap came from observed peak (no manual override)
+  resetAt: number | null; // epoch ms of next reset; null = no active window (full allowance)
+}
+
+export interface Quota {
+  block5h: WindowQuota; // current 5h session block
+  week: WindowQuota; // current weekly window
+}
+
 export interface Metrics {
   now: number;
   window5h: WindowSum;
   window7d: WindowSum;
+  quota: Quota;
   devices: DeviceMetric[];
   crossDeviceMedianTokensPerTask: number;
   models: ModelMetric[];
@@ -206,6 +220,50 @@ function trendBuckets(
   return buckets;
 }
 
+interface Block {
+  start: number;
+  end: number;
+  total: number;
+}
+
+// 5h session blocks: a block opens on the first prompt and runs blockMs; the next
+// prompt at/after the block ends opens a fresh block (Anthropic's real model).
+function sessionBlocks(rows: DeviceRow[], blockMs: number): Block[] {
+  const times = rows
+    .map((r) => ({ t: Date.parse(r.ts), tok: totalTokens(r) }))
+    .filter((x) => !Number.isNaN(x.t))
+    .sort((a, b) => a.t - b.t);
+  const blocks: Block[] = [];
+  for (const { t, tok } of times) {
+    const last = blocks[blocks.length - 1];
+    if (!last || t >= last.end) blocks.push({ start: t, end: t + blockMs, total: tok });
+    else last.total += tok;
+  }
+  return blocks;
+}
+
+// Most recent weekly-reset boundary (UTC) at or before `now`.
+function lastWeeklyReset(now: number, day: number, hour: number): number {
+  const d = new Date(now);
+  let boundary = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), hour);
+  boundary -= ((new Date(boundary).getUTCDay() - day + 7) % 7) * DAY;
+  if (boundary > now) boundary -= 7 * DAY;
+  return boundary;
+}
+
+function quotaOf(
+  used: number,
+  override: number | null,
+  peak: number,
+  floor: number,
+  headroom: number,
+  resetAt: number | null,
+): WindowQuota {
+  const calibrated = override == null;
+  const cap = calibrated ? Math.max(floor, Math.ceil(peak * (1 + headroom))) : override;
+  return { used, cap, ratio: cap > 0 ? Math.min(1, used / cap) : 0, calibrated, resetAt };
+}
+
 export function computeMetrics(
   rows: DeviceRow[],
   now: number,
@@ -215,17 +273,54 @@ export function computeMetrics(
   const window7d = sumWindow(rows, now, limits.window7dMs);
   const devices = deviceMetrics(rows);
 
+  // --- 5h session block ---
+  const blocks = sessionBlocks(rows, limits.window5hMs);
+  const peakBlock = blocks.reduce((m, b) => Math.max(m, b.total), 0);
+  const active = blocks[blocks.length - 1];
+  const blockActive = active != null && now < active.end;
+  const used5h = blockActive ? active.total : 0;
+  const reset5hAt = blockActive ? active.end : null;
+  const block5h = quotaOf(
+    used5h,
+    limits.cap5hOverride,
+    peakBlock,
+    limits.cap5hFloor,
+    limits.autoHeadroom,
+    reset5hAt,
+  );
+
+  // --- weekly window (fixed reset) ---
+  const weekStart = lastWeeklyReset(now, limits.weeklyResetDay, limits.weeklyResetHour);
+  const weekByBoundary = new Map<number, number>();
+  let usedWeek = 0;
+  for (const r of rows) {
+    const t = Date.parse(r.ts);
+    if (Number.isNaN(t)) continue;
+    const b = lastWeeklyReset(t, limits.weeklyResetDay, limits.weeklyResetHour);
+    weekByBoundary.set(b, (weekByBoundary.get(b) ?? 0) + totalTokens(r));
+    if (b === weekStart) usedWeek += totalTokens(r);
+  }
+  const peakWeek = [...weekByBoundary.values()].reduce((m, v) => Math.max(m, v), 0);
+  const week = quotaOf(
+    usedWeek,
+    limits.cap7dOverride,
+    peakWeek,
+    limits.cap7dFloor,
+    limits.autoHeadroom,
+    weekStart + 7 * DAY,
+  );
+
+  // --- burn rate against the 5h block ---
   const lastHour = sumWindow(rows, now, HOUR).total;
-  const remaining = Math.max(0, limits.cap5h - window5h.total);
+  const remaining = Math.max(0, block5h.cap - used5h);
   const hoursToCap = lastHour > 0 ? remaining / lastHour : Infinity;
   const burn: BurnRate = {
     ratePerHour: lastHour,
-    used5h: window5h.total,
-    cap5h: limits.cap5h,
+    used5h,
+    cap5h: block5h.cap,
     remaining,
     hoursToCap,
-    // ponytail: rolling-window approximation — "would hit the 5h cap within 5h at this pace".
-    hitsWithinWindow: window5h.total >= limits.cap5h || hoursToCap <= 5,
+    hitsWithinWindow: used5h >= block5h.cap || hoursToCap <= 5,
   };
 
   // Downgrade rule inputs: 25th-pct complexity over ALL tasks; count Opus tasks below it.
@@ -243,6 +338,7 @@ export function computeMetrics(
     now,
     window5h,
     window7d,
+    quota: { block5h, week },
     devices,
     crossDeviceMedianTokensPerTask: median(devices.map((d) => d.medianTokensPerTask)),
     models: modelMetrics(last7d),

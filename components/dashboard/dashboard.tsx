@@ -12,6 +12,7 @@ import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useEntrance } from "./anim";
 import { QuotaGauge } from "./quota-gauge";
+import { ResetCountdown } from "./reset-countdown";
 import { BurnRateCard } from "./burn-rate-card";
 import { CacheHitRate } from "./cache-hit-rate";
 import { TopTasksTable } from "./top-tasks-table";
@@ -106,13 +107,29 @@ export function Dashboard() {
     >
       <Panel
         title="Quota & burn-rate"
-        sub="trailing 5h / 7d windows"
+        sub="5h session block · weekly window"
         className="md:col-span-2 lg:col-span-2"
       >
         {metrics ? (
           <div className="flex flex-wrap items-center justify-around gap-4">
-            <QuotaGauge used={metrics.window5h.total} cap={metrics.burn.cap5h} label="5h" />
-            <QuotaGauge used={metrics.window7d.total} cap={LIMITS.cap7d} label="7d" />
+            <div className="flex flex-col items-center gap-1">
+              <QuotaGauge
+                used={metrics.quota.block5h.used}
+                cap={metrics.quota.block5h.cap}
+                calibrated={metrics.quota.block5h.calibrated}
+                label="5h block"
+              />
+              <ResetCountdown resetAt={metrics.quota.block5h.resetAt} />
+            </div>
+            <div className="flex flex-col items-center gap-1">
+              <QuotaGauge
+                used={metrics.quota.week.used}
+                cap={metrics.quota.week.cap}
+                calibrated={metrics.quota.week.calibrated}
+                label="weekly"
+              />
+              <ResetCountdown resetAt={metrics.quota.week.resetAt} />
+            </div>
             <div className="min-w-40 flex-1">
               <BurnRateCard burn={metrics.burn} />
             </div>

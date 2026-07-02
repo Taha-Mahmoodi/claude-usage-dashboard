@@ -80,6 +80,28 @@ test("computeMetrics: downgrade candidates + burn approaching cap", () => {
 
   // Force the burn window over a tiny cap → hitsWithinWindow true.
   const hot = [mk({ ts: new Date(NOW - 30 * 60_000).toISOString(), output_tokens: 1000 })];
-  const burnM = computeMetrics(hot, NOW, { ...LIMITS, cap5h: 10 });
+  const burnM = computeMetrics(hot, NOW, { ...LIMITS, cap5hOverride: 10 });
   assert.equal(burnM.burn.hitsWithinWindow, true);
+});
+
+test("quota: 5h session block usage + reset time", () => {
+  const rows = [
+    mk({ ts: new Date(NOW - 2 * H).toISOString(), input_tokens: 100 }),
+    mk({ ts: new Date(NOW - 1 * H).toISOString(), input_tokens: 100 }),
+  ];
+  const q = computeMetrics(rows, NOW, LIMITS).quota.block5h;
+  assert.equal(q.used, 200); // both rows in the one active block
+  assert.equal(q.resetAt, NOW - 2 * H + 5 * H); // block opened at NOW-2h, resets +5h
+  assert.equal(q.calibrated, true);
+  assert.equal(q.cap, LIMITS.cap5hFloor); // tiny peak → floor
+});
+
+test("quota: no active block → full allowance (reset null)", () => {
+  const q = computeMetrics(
+    [mk({ ts: new Date(NOW - 10 * H).toISOString(), input_tokens: 100 })],
+    NOW,
+    LIMITS,
+  ).quota.block5h;
+  assert.equal(q.used, 0);
+  assert.equal(q.resetAt, null);
 });

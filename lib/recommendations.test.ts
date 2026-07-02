@@ -54,6 +54,6 @@ test("low cache reuse is flagged", () => {
 
 test("approaching-limit fires when burn exceeds cap", () => {
   const rows = [mk({ ts: new Date(NOW - 30 * 60_000).toISOString(), output_tokens: 1000 })];
-  const recs = recommend(computeMetrics(rows, NOW, { ...LIMITS, cap5h: 10 }), { ...LIMITS, cap5h: 10 });
+  const recs = recommend(computeMetrics(rows, NOW, { ...LIMITS, cap5hOverride: 10 }), { ...LIMITS, cap5hOverride: 10 });
   assert.ok(recs.some((r) => r.id === "approaching-limit"));
 });

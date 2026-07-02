@@ -14,3 +14,14 @@ export function fmtHours(h: number): string {
   if (h >= 1) return `${h.toFixed(1)}h`;
   return `${Math.round(h * 60)}m`;
 }
+
+export function fmtDurationMs(ms: number): string {
+  if (ms <= 0) return "now";
+  const totalMin = Math.floor(ms / 60000);
+  const d = Math.floor(totalMin / 1440);
+  const h = Math.floor((totalMin % 1440) / 60);
+  const m = totalMin % 60;
+  if (d > 0) return `${d}d ${h}h`;
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
+}

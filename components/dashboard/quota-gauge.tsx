@@ -10,10 +10,12 @@ export function QuotaGauge({
   used,
   cap,
   label,
+  calibrated = false,
 }: {
   used: number;
   cap: number;
   label: string;
+  calibrated?: boolean;
 }) {
   const ratio = cap > 0 ? Math.min(1, used / cap) : 0;
   const over = cap > 0 && used >= cap;
@@ -105,6 +107,11 @@ export function QuotaGauge({
       </div>
       <div className="mt-1 text-xs text-muted-foreground tabular-nums">
         {fmtTokens(used)} / {fmtTokens(cap)}
+        {calibrated && (
+          <span className="ml-1 text-[10px] opacity-70" title="Auto-calibrated to your observed peak — set a real cap in config/limits.ts">
+            est
+          </span>
+        )}
       </div>
     </div>
   );
