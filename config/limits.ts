@@ -20,9 +20,11 @@ export interface Limits {
   cap5hFloor: number;
   cap7dFloor: number;
 
-  // Weekly reset (UTC). Find yours on claude.ai usage; adjust hour for your timezone.
+  // Weekly reset, in the viewer's LOCAL time (whatever tz the browser is in).
+  // Find yours on the Claude app (it shows the exact reset day/time).
   weeklyResetDay: number; // 0=Sun … 6=Sat
-  weeklyResetHour: number; // 0–23 UTC
+  weeklyResetHour: number; // 0–23 local
+  weeklyResetMinute: number; // 0–59 local
 
   cacheHitFloor: number;
   outlierFactor: number;
@@ -36,15 +38,20 @@ export const LIMITS: Limits = {
   window5hMs: 5 * HOUR,
   window7dMs: 7 * DAY,
 
-  cap5hOverride: null,
-  cap7dOverride: null,
+  // Calibrated from the Claude app on 2026-07-02: cost-weighted usage of ~146k read as
+  // 11% of the 5h limit and 4% of the weekly limit → cap ≈ used / fraction. These are in
+  // COST-WEIGHTED tokens (cache reads ×0.1), matching lib/metrics costTokens.
+  // Re-derive if the app % and this dashboard's % drift apart.
+  cap5hOverride: 1_330_000,
+  cap7dOverride: 3_650_000,
 
   autoHeadroom: 0.25,
   cap5hFloor: 1_000_000,
   cap7dFloor: 20_000_000,
 
-  weeklyResetDay: 3, // placeholder (Wed) — set to your account's weekly reset
-  weeklyResetHour: 0,
+  weeklyResetDay: 4, // Thursday (Taha's account) — set to yours from the Claude app
+  weeklyResetHour: 22,
+  weeklyResetMinute: 29,
 
   cacheHitFloor: 0.3,
   outlierFactor: 2,

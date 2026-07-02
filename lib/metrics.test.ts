@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   totalTokens,
+  costTokens,
   complexity,
   modelFamily,
   percentile,
@@ -34,6 +35,8 @@ function mk(over: Partial<DeviceRow> = {}): DeviceRow {
 
 test("scalars", () => {
   assert.equal(totalTokens({ input_tokens: 1, output_tokens: 2, cache_creation_tokens: 3, cache_read_tokens: 4 }), 10);
+  // cost weights cache reads ×0.1: 100 + 0 + 0 + 1000×0.1 = 200
+  assert.equal(costTokens({ input_tokens: 100, output_tokens: 0, cache_creation_tokens: 0, cache_read_tokens: 1000 }), 200);
   assert.equal(complexity({ tool_calls: 2, output_tokens: 5 }), 7);
   assert.equal(modelFamily("claude-opus-4-8"), "Opus");
   assert.equal(modelFamily("claude-sonnet-5"), "Sonnet");
@@ -89,11 +92,21 @@ test("quota: 5h session block usage + reset time", () => {
     mk({ ts: new Date(NOW - 2 * H).toISOString(), input_tokens: 100 }),
     mk({ ts: new Date(NOW - 1 * H).toISOString(), input_tokens: 100 }),
   ];
-  const q = computeMetrics(rows, NOW, LIMITS).quota.block5h;
+  // Force auto-calibration (override off) to exercise the peak/floor path.
+  const q = computeMetrics(rows, NOW, { ...LIMITS, cap5hOverride: null }).quota.block5h;
   assert.equal(q.used, 200); // both rows in the one active block
   assert.equal(q.resetAt, NOW - 2 * H + 5 * H); // block opened at NOW-2h, resets +5h
   assert.equal(q.calibrated, true);
   assert.equal(q.cap, LIMITS.cap5hFloor); // tiny peak → floor
+});
+
+test("quota: weekly reset lands on the configured local day/time, within 7d", () => {
+  const at = computeMetrics([mk({ input_tokens: 100 })], NOW, LIMITS).quota.week.resetAt!;
+  const r = new Date(at);
+  assert.equal(r.getDay(), LIMITS.weeklyResetDay);
+  assert.equal(r.getHours(), LIMITS.weeklyResetHour);
+  assert.equal(r.getMinutes(), LIMITS.weeklyResetMinute);
+  assert.ok(at > NOW && at <= NOW + 7 * 24 * H);
 });
 
 test("quota: no active block → full allowance (reset null)", () => {

@@ -1,7 +1,7 @@
 "use client";
 
 import type { DeviceRow } from "@/lib/types";
-import { totalTokens, modelFamily } from "@/lib/metrics";
+import { costTokens, modelFamily } from "@/lib/metrics";
 import { fmtTokens } from "@/lib/format";
 import {
   Table,
@@ -34,7 +34,7 @@ export function TopTasksTable({ tasks }: { tasks: DeviceRow[] }) {
             </TableCell>
             <TableCell className="py-2">{modelFamily(t.model)}</TableCell>
             <TableCell className="py-2 text-right font-medium tabular-nums">
-              {fmtTokens(totalTokens(t))}
+              {fmtTokens(costTokens(t))}
             </TableCell>
           </TableRow>
         ))}

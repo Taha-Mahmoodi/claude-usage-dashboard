@@ -19,6 +19,18 @@ export function totalTokens(r: {
   );
 }
 
+// Rate-limit-weighted tokens: cache reads count at ~0.1× (Anthropic discounts them
+// heavily), so a long session re-reading cached context doesn't dominate. This tracks
+// the Claude app's usage % far better than the raw sum, which is ~99% cache_read.
+export function costTokens(r: {
+  input_tokens: number;
+  output_tokens: number;
+  cache_creation_tokens: number;
+  cache_read_tokens: number;
+}): number {
+  return r.input_tokens + r.output_tokens + r.cache_creation_tokens + r.cache_read_tokens * 0.1;
+}
+
 // One task = one Stop-hook firing = one row. Complexity heuristic from the spec.
 export function complexity(r: { tool_calls: number; output_tokens: number }): number {
   return r.tool_calls + r.output_tokens;
@@ -169,7 +181,7 @@ function deviceMetrics(rows: DeviceRow[]): DeviceMetric[] {
   const byDevice = groupBy(rows, (r) => r.device);
   const out: DeviceMetric[] = [];
   for (const [device, rs] of byDevice) {
-    const perTask = rs.map(totalTokens);
+    const perTask = rs.map(costTokens);
     out.push({
       device,
       tokens: perTask.reduce((a, b) => a + b, 0),
@@ -182,12 +194,12 @@ function deviceMetrics(rows: DeviceRow[]): DeviceMetric[] {
 }
 
 function modelMetrics(rows: DeviceRow[]): ModelMetric[] {
-  const totalTok = rows.reduce((a, r) => a + totalTokens(r), 0);
+  const totalTok = rows.reduce((a, r) => a + costTokens(r), 0);
   const totalTasks = rows.length;
   const byModel = groupBy(rows, (r) => modelFamily(r.model));
   const out: ModelMetric[] = [];
   for (const [model, rs] of byModel) {
-    const tokens = rs.reduce((a, r) => a + totalTokens(r), 0);
+    const tokens = rs.reduce((a, r) => a + costTokens(r), 0);
     out.push({
       model,
       tokens,
@@ -215,7 +227,7 @@ function trendBuckets(
     const t = Date.parse(r.ts);
     if (Number.isNaN(t) || t <= start || t > now) continue;
     const i = Math.min(nBuckets - 1, Math.floor((t - start) / bucketMs));
-    buckets[i].tokens += totalTokens(r);
+    buckets[i].tokens += costTokens(r);
   }
   return buckets;
 }
@@ -230,7 +242,7 @@ interface Block {
 // prompt at/after the block ends opens a fresh block (Anthropic's real model).
 function sessionBlocks(rows: DeviceRow[], blockMs: number): Block[] {
   const times = rows
-    .map((r) => ({ t: Date.parse(r.ts), tok: totalTokens(r) }))
+    .map((r) => ({ t: Date.parse(r.ts), tok: costTokens(r) }))
     .filter((x) => !Number.isNaN(x.t))
     .sort((a, b) => a.t - b.t);
   const blocks: Block[] = [];
@@ -242,11 +254,12 @@ function sessionBlocks(rows: DeviceRow[], blockMs: number): Block[] {
   return blocks;
 }
 
-// Most recent weekly-reset boundary (UTC) at or before `now`.
-function lastWeeklyReset(now: number, day: number, hour: number): number {
+// Most recent weekly-reset boundary at or before `now`, in the viewer's LOCAL time.
+// (Anthropic's weekly reset is a wall-clock day/time; the browser is in the user's tz.)
+function lastWeeklyReset(now: number, day: number, hour: number, minute: number): number {
   const d = new Date(now);
-  let boundary = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), hour);
-  boundary -= ((new Date(boundary).getUTCDay() - day + 7) % 7) * DAY;
+  let boundary = new Date(d.getFullYear(), d.getMonth(), d.getDate(), hour, minute, 0, 0).getTime();
+  boundary -= ((new Date(boundary).getDay() - day + 7) % 7) * DAY;
   if (boundary > now) boundary -= 7 * DAY;
   return boundary;
 }
@@ -290,15 +303,25 @@ export function computeMetrics(
   );
 
   // --- weekly window (fixed reset) ---
-  const weekStart = lastWeeklyReset(now, limits.weeklyResetDay, limits.weeklyResetHour);
+  const weekStart = lastWeeklyReset(
+    now,
+    limits.weeklyResetDay,
+    limits.weeklyResetHour,
+    limits.weeklyResetMinute,
+  );
   const weekByBoundary = new Map<number, number>();
   let usedWeek = 0;
   for (const r of rows) {
     const t = Date.parse(r.ts);
     if (Number.isNaN(t)) continue;
-    const b = lastWeeklyReset(t, limits.weeklyResetDay, limits.weeklyResetHour);
-    weekByBoundary.set(b, (weekByBoundary.get(b) ?? 0) + totalTokens(r));
-    if (b === weekStart) usedWeek += totalTokens(r);
+    const b = lastWeeklyReset(
+      t,
+      limits.weeklyResetDay,
+      limits.weeklyResetHour,
+      limits.weeklyResetMinute,
+    );
+    weekByBoundary.set(b, (weekByBoundary.get(b) ?? 0) + costTokens(r));
+    if (b === weekStart) usedWeek += costTokens(r);
   }
   const peakWeek = [...weekByBoundary.values()].reduce((m, v) => Math.max(m, v), 0);
   const week = quotaOf(
@@ -310,8 +333,12 @@ export function computeMetrics(
     weekStart + 7 * DAY,
   );
 
-  // --- burn rate against the 5h block ---
-  const lastHour = sumWindow(rows, now, HOUR).total;
+  // --- burn rate against the 5h block (cost-weighted, like the caps) ---
+  const hourAgo = now - HOUR;
+  const lastHour = rows.reduce((s, r) => {
+    const t = Date.parse(r.ts);
+    return !Number.isNaN(t) && t > hourAgo && t <= now ? s + costTokens(r) : s;
+  }, 0);
   const remaining = Math.max(0, block5h.cap - used5h);
   const hoursToCap = lastHour > 0 ? remaining / lastHour : Infinity;
   const burn: BurnRate = {
@@ -331,7 +358,7 @@ export function computeMetrics(
   ).length;
 
   const topTasks = [...last7d]
-    .sort((a, b) => totalTokens(b) - totalTokens(a))
+    .sort((a, b) => costTokens(b) - costTokens(a))
     .slice(0, 5);
 
   return {
