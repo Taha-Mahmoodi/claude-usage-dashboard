@@ -19,8 +19,11 @@ export const DAY = 24 * HOUR;
 export const LIMITS: Limits = {
   window5hMs: 5 * HOUR,
   window7dMs: 7 * DAY,
-  cap5h: 88_000_000, // placeholder — calibrate
-  cap7d: 880_000_000, // placeholder — calibrate
+  // ponytail: demo placeholders sized so the fixture data reads meaningfully
+  // (gauges fill, approaching-limit fires). RECALIBRATE for real usage — the true
+  // Max20x token caps are unpublished; tune from when throttling is first observed.
+  cap5h: 500_000,
+  cap7d: 6_000_000,
   cacheHitFloor: 0.3,
   outlierFactor: 2,
   downgradePercentile: 0.25,

@@ -5,25 +5,25 @@
 
 ## Current phase
 
-**Phase 3 — dashboard components against fixture data** (build order step 3). Phases 0–2 complete.
+**Phase 4 — animations (GSAP entrance + anime.js micro-interactions)** (build order step 4). Phases 0–3 complete.
 
 ## Last completed
 
-- Phase 0 setup: repos created, `prod`+`dev` branches, data repo seeded, STATE.md.
-- Phase 1 scaffold (`feat/scaffold`, **PR #1 → dev, awaiting Taha's merge**): Next 16 + React 19 + Tailwind v4 + shadcn glass shell. Verified clean.
-- Phase 2 data layer (`feat/data-layer`, stacked on `feat/scaffold`, **PR #2**):
-  - `lib/types.ts` (raw schema), `lib/metrics.ts` (pure: totalTokens, complexity, modelFamily, percentile/median, sumWindow, cacheHitRate, `computeMetrics` → windows/devices/models/topTasks/trend/burn/downgrade), `lib/recommendations.ts` (4 rules), `lib/fetch-usage.ts` (`fetchUsage` + defensive `parseNdjson`), `config/limits.ts` (calibratable caps, placeholders).
-  - `__fixtures__/generate.mjs` → `sample-device.ndjson` (176 rows, deterministic, 30d + 5h burst).
-  - Tests: `lib/*.test.ts` run via `node --test` (Node 26 native TS). 10 pass. `npm test` wired.
-  - `tsconfig` excludes `**/*.test.ts` (they use `.ts`-extension imports the app compiler rejects). Verified: tests/tsc/eslint/build all clean.
+- Phases 0–2: repos, branches, scaffold (**PR #1**), data layer + tests (**PR #2**). Both awaiting Taha's merge.
+- Phase 3 components (`feat/dashboard-components`, stacked on `feat/data-layer`, **PR #3**):
+  - 8 components in `components/dashboard/`: quota-gauge (SVG 270° arc), burn-rate-card, device-breakdown (Recharts bar), model-mix-chart (Recharts donut), cache-hit-rate (scaleX bars), top-tasks-table (shadcn Table), trend-chart (Recharts area, hourly→daily rollup), recommendations-feed.
+  - `dashboard.tsx` orchestrator (client): fetches fixture via `fetchUsage(FIXTURE_BASE)` + `shiftToNow`, `useMemo` metrics + recs, grid layout. The 3 Recharts charts `next/dynamic` `ssr:false` (kept out of initial bundle).
+  - `lib/fixture.ts` (shift ref→now), `lib/format.ts` (fmtTokens/pct/fmtHours). Multi-device fixtures in `public/fixtures/` (4 devices, one outlier + one low-cache) via updated `generate.mjs`.
+  - Chart palette added to `globals.css` (`--chart-1..5`). Tuned `config/limits.ts` caps to demo-friendly values (gauges fill, approaching-limit fires) — flagged to recalibrate.
+  - Verified: tsc/eslint/build clean, 10 tests pass, **initial route JS 195KB gzip < 200KB budget** (Recharts confirmed code-split out via ssr:false dynamic import), renders clean desktop + mobile, no console errors (one benign transient Recharts `width(0)` dev warning on first paint).
 
 ## Next task
 
-Phase 3: build the 8 components in `components/dashboard/` against fixture data (quota-gauge, burn-rate-card, device-breakdown, model-mix-chart, cache-hit-rate, top-tasks-table, trend-chart, recommendations-feed). Feed them `computeMetrics(rows, now, LIMITS)` + `recommend(...)`. Need a fixture loader that shifts the fixture's `2026-07-02T18:00Z` ref to real `now` so windows include data. Charts = shadcn (Recharts), dynamically imported `ssr:false` per the perf rule. Virtualize top-tasks only if >50 rows (it's 5, so skip). Branch `feat/dashboard-components` off `feat/data-layer` (stacked) until PRs #1/#2 merge.
+Phase 4: GSAP entrance (stagger the panels in on load) + anime.js micro-interactions (quota-gauge fill count-up, number count-ups). Both **dynamically imported** so they stay out of the initial 195KB bundle (perf rule). Animate transform/opacity only (no layout props). shadcn/Radix handles its own transitions — don't hand-roll those. Branch `feat/animations` off `feat/dashboard-components` (stacked).
 
-## Perf-rule note (still owed)
+## Perf-rule status
 
-Capture the route-size table once charts land (Phase 3+) and check ≤200KB/route gzip. Next 16 turbopack build table omits per-route JS — may need `next build` analysis or `@next/bundle-analyzer` to get real numbers.
+MET for now: initial route JS **194.9KB gzip < 200KB** (measured from prod HTML's referenced chunks; Recharts is a separate lazy chunk). Still owed: a real Lighthouse ≥95 / FCP <1.5s run — best done against the deployed VPS build; architecture (static prerender + code-split heavy libs) supports it. Keep GSAP/anime.js dynamically imported so Phase 4 doesn't blow the budget.
 
 ## Blockers / open items
 
